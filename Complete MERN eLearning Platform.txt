@@ -1,0 +1,330 @@
+Complete MERN eLearning Platform - Architecture & Implementation Plan
+PHASE 1: Project Scaffolding & Foundation
+E-Learning/
+├── server/                          # Backend (Node.js + Express)
+│   ├── config/
+│   │   ├── db.js                    # MongoDB connection
+│   │   ├── cloudinary.js            # Cloudinary config
+│   │   └── index.js                 # Env vars export
+│   ├── middleware/
+│   │   ├── auth.js                  # JWT verification
+│   │   ├── authorize.js             # Role-based access (student/instructor/admin)
+│   │   ├── errorHandler.js          # Global error handler
+│   │   ├── validate.js              # Request validation wrapper
+│   │   └── upload.js                # Multer config
+│   ├── models/
+│   │   ├── User.js
+│   │   ├── Course.js
+│   │   ├── Module.js
+│   │   ├── Lesson.js
+│   │   ├── Enrollment.js
+│   │   ├── Review.js
+│   │   ├── Payment.js
+│   │   ├── Quiz.js
+│   │   ├── QuizAttempt.js
+│   │   ├── Certificate.js
+│   │   ├── Notification.js
+│   │   ├── Message.js
+│   │   ├── Coupon.js
+│   │   ├── Category.js
+│   │   └── Assignment.js
+│   ├── controllers/
+│   ├── routes/
+│   ├── utils/
+│   │   ├── AppError.js
+│   │   ├── sendEmail.js
+│   │   ├── generateToken.js
+│   │   └── helpers.js
+│   ├── server.js
+│   └── package.json
+│
+├── client/                          # Frontend (React + Vite)
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/
+│   │   │   ├── ui/                  # Reusable UI: Button, Input, Modal, Card, etc.
+│   │   │   ├── layout/             # Navbar, Sidebar, Footer, Breadcrumbs
+│   │   │   ├── common/             # Loader, Skeleton, EmptyState, ErrorBoundary
+│   │   │   └── animations/         # AnimatedSection, CountUp, ScrollReveal
+│   │   ├── pages/
+│   │   │   ├── landing/            # Home, About, Pricing, FAQ, Contact
+│   │   │   ├── auth/               # Login, Register, ForgotPassword, ResetPassword
+│   │   │   ├── courses/            # CourseList, CourseDetail, CoursePlayer
+│   │   │   ├── student/            # Dashboard, MyCourses, Wishlist, Certificates
+│   │   │   ├── instructor/         # Dashboard, CourseBuilder, Analytics, Earnings
+│   │   │   └── admin/              # Dashboard, Users, Courses, Payments, Settings
+│   │   ├── context/                # AuthContext, ThemeContext, SocketContext
+│   │   ├── hooks/                  # useAuth, useFetch, useSocket, useInView
+│   │   ├── services/               # API client (axios)
+│   │   ├── utils/                  # formatters, validators, constants
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css               # Tailwind v4 imports + custom styles
+│   ├── index.html
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   └── package.json
+│
+└── package.json                     # Root package.json (concurrently scripts)
+PHASE 2: Database Schema Design (MongoDB/Mongoose)
+Core Collections:
+Collection	Key Fields
+users	name, email, password, role(student/instructor/admin), avatar, bio, socialLinks, skills, interests, isVerified, verificationToken, resetPasswordToken, refreshToken, enrolledCourses[], createdAt
+courses	title, slug, description, price, thumbnail, trailer, category, instructor(ref), level, duration, language, outcomes[], requirements[], modules[], totalStudents, avgRating, totalReviews, status(draft/published), createdAt
+modules	course(ref), title, description, order, lessons[]
+lessons	module(ref), title, description, videoUrl, duration, resources[], order, isFree, attachments[]
+enrollments	student(ref), course(ref), progress%, completedLessons[], enrolledAt, completedAt, certificate(ref)
+reviews	student(ref), course(ref), rating, review, likes[], createdAt
+payments	student(ref), course(ref), amount, currency, status, stripeSessionId, instructorEarnings, platformFee, createdAt
+quizzes	course(ref), lesson(ref), title, questions[{type, question, options[], correctAnswer, points}], timeLimit, passingScore
+quizattempts	student(ref), quiz(ref), answers[], score, passed, attemptNumber, startedAt, completedAt
+certificates	student(ref), course(ref), certificateId(unique), studentName, courseName, completionDate, instructorSignature, verified
+notifications	user(ref), type, title, message, link, isRead, createdAt
+messages	sender(ref), receiver(ref), course(ref), content, attachments[], isRead, createdAt
+categories	name, slug, icon, description, image
+coupons	code, discount%, maxUses, currentUses, expiresAt, course(ref) or all
+PHASE 3: Backend API Routes
+AUTH /api/v1/auth
+  POST   /register          - Register (auto-role detection)
+  POST   /login             - Login (returns JWT + httpOnly cookie)
+  POST   /logout            - Clear cookie
+  POST   /forgot-password   - Send reset email
+  POST   /reset-password/:token
+  POST   /verify-email/:token
+  POST   /send-otp
+  POST   /verify-otp
+  GET    /me                - Get current user
+  PUT    /me                - Update profile
+
+USERS /api/v1/users
+  GET    /                  - Admin: list all users (paginated, filterable)
+  GET    /:id
+  PUT    /:id               - Admin: update user role/status
+  DELETE /:id               - Admin: delete user
+
+COURSES /api/v1/courses
+  GET    /                  - Public: list courses (search, filter, sort, paginate)
+  GET    /featured          - Featured courses
+  GET    /:slug             - Single course detail
+  POST   /                  - Instructor: create course
+  PUT    /:id               - Instructor: update course
+  DELETE /:id               - Instructor/Admin: delete course
+  POST   /:id/thumbnail     - Upload thumbnail
+
+MODULES /api/v1/courses/:courseId/modules
+  GET    /                  - Get all modules (with lessons)
+  POST   /                  - Create module
+  PUT    /:id               - Update module
+  DELETE /:id               - Delete module
+  PUT    /reorder           - Reorder modules
+
+LESSONS /api/v1/modules/:moduleId/lessons
+  GET    /                  - Get lessons
+  POST   /                  - Create lesson
+  PUT    /:id               - Update lesson
+  DELETE /:id               - Delete lesson
+  POST   /:id/video         - Upload video
+
+ENROLLMENTS /api/v1/enrollments
+  POST   /                  - Enroll in course
+  GET    /my                - My enrolled courses
+  PUT    /:id/progress      - Update lesson progress
+  GET    /:id               - Single enrollment detail
+
+REVIEWS /api/v1/reviews
+  GET    /course/:courseId  - Course reviews
+  POST   /                  - Create review
+  PUT    /:id               - Update review
+  DELETE /:id               - Delete review
+  POST   /:id/like          - Toggle like
+
+PAYMENTS /api/v1/payments
+  POST   /create-checkout   - Stripe checkout session
+  POST   /webhook           - Stripe webhook
+  GET    /history           - My payment history
+  GET    /earnings          - Instructor earnings
+
+QUIZZES /api/v1/quizzes
+  POST   /                  - Instructor: create quiz
+  GET    /lesson/:lessonId  - Get quiz
+  POST   /:id/attempt       - Submit attempt
+  GET    /:id/attempts      - My attempts
+
+CERTIFICATES /api/v1/certificates
+  GET    /my                - My certificates
+  GET    /verify/:id        - Verify certificate
+  POST   /:enrollmentId     - Generate certificate
+
+NOTIFICATIONS /api/v1/notifications
+  GET    /                  - My notifications
+  PUT    /:id/read          - Mark read
+  PUT    /read-all          - Mark all read
+
+MESSAGES /api/v1/messages
+  GET    /conversations     - My conversations
+  GET    /:userId           - Chat with user
+  POST   /                  - Send message
+
+ADMIN /api/v1/admin
+  GET    /stats             - Platform statistics
+  GET    /users             - All users
+  GET    /courses           - All courses
+  GET    /payments          - All payments
+  PUT    /settings          - Update platform settings
+PHASE 4: Frontend Architecture
+Route Structure:
+/                          → Landing Page
+/auth/login                → Login
+/auth/register             → Register
+/auth/forgot-password      → Forgot Password
+/auth/reset-password/:token
+
+/courses                   → Course Listing (search/filter)
+/courses/:slug             → Course Detail
+/courses/:slug/learn/:lessonId  → Course Player (protected)
+
+/student/dashboard         → Student Dashboard
+/student/my-courses        → Enrolled Courses
+/student/wishlist          → Wishlist
+/student/certificates      → My Certificates
+/student/notifications     → Notifications
+/student/messages          → Messages
+/student/profile           → Profile Settings
+/student/payment-history   → Payment History
+/student/quiz/:quizId      → Take Quiz
+
+/instructor/dashboard      → Instructor Dashboard
+/instructor/courses        → My Courses
+/instructor/courses/create → Create Course
+/instructor/courses/:id/edit → Edit Course (Course Builder)
+/instructor/analytics      → Analytics & Reports
+/instructor/earnings       → Earnings
+/instructor/reviews        → Reviews
+/instructor/messages       → Messages
+/instructor/profile        → Profile
+
+/admin/dashboard           → Admin Dashboard
+/admin/users               → Manage Users
+/admin/courses             → Manage Courses
+/admin/categories          → Manage Categories
+/admin/payments            → Payments & Refunds
+/admin/reports             → Reports & Analytics
+/admin/settings            → Platform Settings
+
+/404                       → NotFound
+Component Breakdown (key ones):
+Category	Components
+UI Library	Button, Input, Select, Textarea, Modal, Drawer, Card, Badge, Avatar, Tabs, Accordion, Tooltip, Dropdown, Breadcrumb, Pagination, Skeleton, Toast, Alert, Spinner, ProgressBar, Rating, Chip, Switch
+Layout	Navbar (dynamic by role), Sidebar (student/instructor/admin), Footer, PageTransition, Breadcrumbs
+Animations	AnimatedSection (scroll-reveal), CountUp, FloatingElements, ParticleBackground, GradientText, GlassCard, Hover3D, TextReveal, Typewriter, Parallax
+Landing	Hero, FeaturedCourses, Categories, Stats Counter, Testimonials, InstructorShowcase, PricingPlans, FAQ, Newsletter, Partners, Achievements
+Auth	LoginForm, RegisterForm (multi-step), ForgotPassword, ResetPassword, OTPVerification, SocialLogin
+Course	CourseCard, CourseGrid, CourseFilters, CourseDetailHero, CurriculumAccordion, ReviewList, ReviewForm, InstructorCard, RelatedCourses
+Player	VideoPlayer (custom), LessonSidebar, ChapterList, Resources, Notes, QASection, Comments, PlayerControls, ProgressBar
+Student Dashboard	DashboardStats, ContinueLearning, RecommendedCourses, ProgressChart, ActivityFeed, WishlistGrid, CertificateCard
+Instructor Dashboard	EarningsChart, StudentEnrollmentChart, CoursePerformance, RecentReviews, QuickActions, RevenueGraph
+Admin Dashboard	PlatformStats, UserChart, RevenueChart, CourseAnalytics, SystemHealth, RecentActivity
+Course Builder	ModuleList, LessonForm, VideoUploader, ThumbnailUploader, PricingForm, RequirementsInput, OutcomesInput, DragDropReorder
+Quiz	QuizAttempt, QuestionCard, Timer, ProgressBar, ResultsScreen, Leaderboard
+Chat	ConversationList, ChatWindow, MessageBubble, TypingIndicator
+Notifications	NotificationList, NotificationBadge, NotificationDropdown
+PHASE 5: Key Features & Implementations
+Authentication Flow:
+- JWT access token (15min) + refresh token (7d httpOnly cookie)
+- Bcrypt password hashing
+- Email verification via Nodemailer
+- OTP for sensitive actions
+- AuthContext with persistence (check /me on mount)
+- ProtectedRoute component wrapping role-based routes
+Video Player:
+- Custom React player built on HTML5 video
+- Speed controls (0.5x-2x), fullscreen, picture-in-picture
+- Lesson progress tracking (auto-update every 30s)
+- Sidebar with full curriculum + current lesson highlight
+- Notes overlay, bookmark timestamps
+- Resources download panel
+Course Builder:
+- Drag-and-drop module/lesson reordering
+- Video upload → Cloudinary with automatic transcoding
+- Rich text editor for descriptions (React Quill)
+- Bulk lesson management
+- Auto-save draft
+- Preview mode
+Quiz Engine:
+- MCQ, True/False, Short Answer, Coding questions
+- Timed/untimed modes
+- Automatic grading (MCQ/TF), manual for written
+- Attempt history with performance analytics
+- Leaderboard per course
+Certificate Generation:
+- HTML-to-PDF (jsPDF or html-pdf-node)
+- Unique SHA-256 certificate ID
+- QR code for verification
+- Canvas-based certificate template with student name, course, date, instructor signature image
+Real-time Features (Socket.io):
+- Live notifications
+- Chat/messaging
+- Instructor online status
+- Announcement broadcasts
+- Typing indicators
+AI-Inspired Features (simulated):
+- "Students also bought" recommendations based on enrollment patterns
+- Personalized learning path (prerequisite chain)
+- Smart search (fuzzy match on course titles/descriptions)
+- Progress insights: "You're 15% ahead of peers"
+PHASE 6: Implementation Order (Recommended)
+Step	Duration	What
+Sprint 1	Setup	Initialize monorepo, Vite + React + Tailwind, Express server, MongoDB connection, folder structure, env configs
+Sprint 2	Backend Core	User model, Auth system (register/login/logout/JWT), error handling middleware, auth middleware, role middleware
+Sprint 3	Models + CRUD APIs	Course, Module, Lesson, Category, Review, Enrollment, Payment models + full CRUD routes
+Sprint 4	Landing Page	Hero, Featured Courses, Categories, Stats, Testimonials, Pricing, FAQ, Newsletter, Footer — fully animated
+Sprint 5	Auth Frontend	Login/Register pages, Forgot/Reset password, email verification UI, AuthContext, ProtectedRoute
+Sprint 6	Course Marketplace	Course listing with search/filter/sort/pagination, Course detail page, Curriculum accordion
+Sprint 7	Student Dashboard	Dashboard layout, stats cards, my courses, continue learning, wishlist, progress tracking
+Sprint 8	Course Player	Video player with controls, lesson sidebar, notes, bookmarks, progress tracking, Q&A
+Sprint 9	Instructor Dashboard	Course builder (CRUD + drag-drop), analytics charts, earnings, reviews management
+Sprint 10	Admin Panel	User management, course moderation, payment oversight, platform settings, stats dashboards
+Sprint 11	Payments	Stripe integration, checkout flow, webhooks, instructor earnings, platform commission
+Sprint 12	Quizzes & Assignments	Quiz builder, attempt flow, grading, results, leaderboard
+Sprint 13	Certificates	Generation, verification, download, sharing
+Sprint 14	Real-time	Socket.io for chat, notifications, announcements
+Sprint 15	Polish	Dark mode, responsive QA, performance optimization, 404 page, loading states, empty states
+Key Library choices (pure JS, no TS):
+Frontend:
+- react@19, react-dom@19, react-router-dom@7
+- vite@6, @vitejs/plugin-react
+- tailwindcss@4, @tailwindcss/vite, postcss
+- framer-motion@12 (animations)
+- react-icons (icons)
+- react-hot-toast or sonner (toasts)
+- react-quill (rich text editor)
+- recharts (charts)
+- jsPDF (certificate PDF)
+- axios (HTTP client)
+- socket.io-client (real-time)
+- @stripe/react-stripe-js, @stripe/stripe-js
+- react-loading-skeleton (skeletons)
+Backend:
+- express, cors, helmet, morgan, express-rate-limit
+- mongoose@9
+- bcryptjs, jsonwebtoken
+- cookie-parser
+- multer, cloudinary, multer-storage-cloudinary
+- nodemailer
+- stripe
+- socket.io
+- express-validator or joi
+- dotenv
+PHASE 7: Deployment Ready considerations
+- .env.example with all variables
+- CORS whitelist in config
+- Rate limiting on auth routes (100 req/15min)
+- Helmet security headers
+- Input sanitization (express-mongo-sanitize, xss-clean)
+- HPP protection
+- MongoDB connection retry logic
+- Graceful shutdown handlers
+- Compression middleware
+- Logging with Morgan (dev) + Winston (prod)
